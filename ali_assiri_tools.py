@@ -1,10 +1,10 @@
 bl_info = {
-    "name": "Sequential Renamer & Mesh Tools",
+    "name": "Ali Assiri Pipeline Tools",
     "author": "Ali Assiri 🌟",
-    "version": (1, 31),
+    "version": (1, 46),
     "blender": (3, 0, 0),
-    "location": "View3D > Sidebar (N) > Rename",
-    "description": "Rename objects, group materials, multi-object open boundaries, quad hole filling, origin coordinates in mm, and UV overlap checker.",
+    "location": "View3D > Sidebar (N) > Ali Assiri 🌟",
+    "description": "Tools with robust file-based connections and fixed FBX export object types.",
     "category": "Object",
 }
 
@@ -13,7 +13,15 @@ import math
 import re
 import colorsys
 import bmesh
+import os
+import json
+import tempfile
 from bpy.props import StringProperty
+from bpy_extras.io_utils import ExportHelper
+
+BRIDGE_FILE_PATH = os.path.join(tempfile.gettempdir(), "blender_max_bridge.json")
+EXPORT_FILE_PATH = os.path.join(tempfile.gettempdir(), "blender_export.obj")
+SUBSTANCE_EXPORT_PATH = os.path.join(tempfile.gettempdir(), "blender_to_substance.obj")
 
 
 def distance_xy(obj_a, obj_b):
@@ -28,45 +36,44 @@ class OBJECT_OT_sequential_rename(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     base_name: StringProperty(
-        name="Base Name",
-        description="Example: wall -> wall_001, wall_002 ...",
+        name="Base Name", 
+        description="Enter the new base name for selected objects", 
         default="Object"
     )
 
     def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self, width=250)
+        if not context.selected_objects:
+            self.report({'ERROR'}, "No objects selected for renaming! ❌")
+            return {'CANCELLED'}
+        return context.window_manager.invoke_props_dialog(self, width=350)
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "base_name")
-        layout.label(text=f"Selected objects: {len(context.selected_objects)}")
+        layout.prop(self, "base_name", text="Name")
 
     def execute(self, context):
         selected = list(context.selected_objects)
-
         if not selected:
-            self.report({'WARNING'}, "No objects selected")
             return {'CANCELLED'}
-
-        start_obj = min(
-            selected,
-            key=lambda obj: obj.location.x ** 2 + obj.location.y ** 2
-        )
-
+        
+        start_obj = min(selected, key=lambda obj: obj.location.x ** 2 + obj.location.y ** 2)
         remaining = [obj for obj in selected if obj != start_obj]
         ordered = [start_obj]
         current = start_obj
-
+        
         while remaining:
             next_obj = min(remaining, key=lambda obj: distance_xy(current, obj))
             ordered.append(next_obj)
             remaining.remove(next_obj)
             current = next_obj
-
+            
+        total_count = len(ordered)
+        digits = max(2, len(str(total_count)))
+        
         for i, obj in enumerate(ordered, start=1):
-            obj.name = f"{self.base_name}_{i:03d}"
-
-        self.report({'INFO'}, f"Renamed {len(ordered)} objects successfully")
+            obj.name = f"{self.base_name}_{i:0{digits}d}"
+            
+        self.report({'INFO'}, f"Successfully renamed {total_count} objects! 📋")
         return {'FINISHED'}
 
 
@@ -76,18 +83,8 @@ class OBJECT_OT_uppercase_names(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        selected = context.selected_objects
-
-        if not selected:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-
-        count = 0
-        for obj in selected:
+        for obj in context.selected_objects:
             obj.name = obj.name.upper()
-            count += 1
-
-        self.report({'INFO'}, f"Converted names of {count} object(s) to uppercase.")
         return {'FINISHED'}
 
 
@@ -97,19 +94,9 @@ class OBJECT_OT_clear_animation(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        selected = context.selected_objects
-
-        if not selected:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-
-        count = 0
-        for obj in selected:
+        for obj in context.selected_objects:
             if obj.animation_data:
                 obj.animation_data_clear()
-                count += 1
-
-        self.report({'INFO'}, f"Cleared animation data for {count} object(s).")
         return {'FINISHED'}
 
 
@@ -120,51 +107,23 @@ class OBJECT_OT_origin_to_nearest_zero(bpy.types.Operator):
 
     def execute(self, context):
         selected = list(context.selected_objects)
-
         if not selected:
-            self.report({'WARNING'}, "No objects selected")
             return {'CANCELLED'}
-
         cursor = context.scene.cursor
-        original_cursor_location = cursor.location.copy()
-        original_active = context.view_layer.objects.active
-
-        updated_count = 0
-
+        orig_loc = cursor.location.copy()
         for obj in selected:
             if obj.type != 'MESH':
                 continue
-
-            matrix_world = obj.matrix_world
-            closest_point = None
-            closest_dist = None
-
-            for v in obj.data.vertices:
-                world_co = matrix_world @ v.co
-                dist = world_co.x ** 2 + world_co.y ** 2 + world_co.z ** 2
-                if closest_dist is None or dist < closest_dist:
-                    closest_dist = dist
-                    closest_point = world_co
-
-            if closest_point is None:
-                continue
-
+            closest_point = min((obj.matrix_world @ v.co for v in obj.data.vertices), 
+                                key=lambda co: co.x**2 + co.y**2 + co.z**2)
             cursor.location = closest_point
-
-            for o in context.selected_objects:
-                o.select_set(False)
+            bpy.ops.object.select_all(action='DESELECT')
             obj.select_set(True)
             context.view_layer.objects.active = obj
-
             bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
-            updated_count += 1
-
+        cursor.location = orig_loc
         for obj in selected:
             obj.select_set(True)
-        context.view_layer.objects.active = original_active
-        cursor.location = original_cursor_location
-
-        self.report({'INFO'}, f"Origin updated for {updated_count} object(s)")
         return {'FINISHED'}
 
 
@@ -175,31 +134,13 @@ class OBJECT_OT_align_to_axes_relative(bpy.types.Operator):
 
     def execute(self, context):
         selected = [obj for obj in context.selected_objects if obj.type == 'MESH']
-
         if not selected:
-            self.report({'WARNING'}, "No mesh objects selected")
             return {'CANCELLED'}
-
-        global_min_y = None
-        global_min_x = None
-
+        g_min_y = min(abs((obj.matrix_world @ v.co).y) for obj in selected for v in obj.data.vertices)
+        g_min_x = min(abs((obj.matrix_world @ v.co).x) for obj in selected for v in obj.data.vertices)
         for obj in selected:
-            matrix_world = obj.matrix_world
-            for v in obj.data.vertices:
-                world_co = matrix_world @ v.co
-                if global_min_y is None or abs(world_co.y) < abs(global_min_y):
-                    global_min_y = world_co.y
-                if global_min_x is None or abs(world_co.x) < abs(global_min_x):
-                    global_min_x = world_co.x
-
-        shift_x = -global_min_x if global_min_x is not None else 0.0
-        shift_y = -global_min_y if global_min_y is not None else 0.0
-
-        for obj in selected:
-            obj.location.x += shift_x
-            obj.location.y += shift_y
-
-        self.report({'INFO'}, f"Shifted {len(selected)} object(s) relative to the closest point successfully.")
+            obj.location.x += -g_min_x
+            obj.location.y += -g_min_y
         return {'FINISHED'}
 
 
@@ -210,45 +151,22 @@ class OBJECT_OT_assign_unique_materials(bpy.types.Operator):
 
     def execute(self, context):
         selected = [obj for obj in context.selected_objects if obj.type == 'MESH']
-
-        if not selected:
-            self.report({'WARNING'}, "No mesh objects selected")
-            return {'CANCELLED'}
-
         groups = {}
         for obj in selected:
             base_name = re.sub(r'[\._]\d+$', '', obj.name)
-            if base_name not in groups:
-                groups[base_name] = []
-            groups[base_name].append(obj)
-
-        group_keys = list(groups.keys())
-        total_groups = len(group_keys)
-        mat_count = 0
-
-        for idx, base_name in enumerate(group_keys):
-            objs = groups[base_name]
-            mat_name = base_name
-            mat = bpy.data.materials.get(mat_name)
-            
-            if mat is None:
-                mat = bpy.data.materials.new(name=mat_name)
-                mat.use_nodes = True
-                bsdf = mat.node_tree.nodes.get("Principled BSDF")
-                if bsdf:
-                    hue = idx / max(total_groups, 1)
-                    rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
-                    vivid_color = (rgb[0], rgb[1], rgb[2], 1.0)
-                    bsdf.inputs['Base Color'].default_value = vivid_color
-
+            groups.setdefault(base_name, []).append(obj)
+        for idx, (base_name, objs) in enumerate(groups.items()):
+            mat = bpy.data.materials.get(base_name) or bpy.data.materials.new(name=base_name)
+            mat.use_nodes = True
+            bsdf = mat.node_tree.nodes.get("Principled BSDF")
+            if bsdf:
+                rgb = colorsys.hsv_to_rgb(idx / max(len(groups), 1), 1.0, 1.0)
+                bsdf.inputs['Base Color'].default_value = (*rgb, 1.0)
             for obj in objs:
                 if obj.data.materials:
                     obj.data.materials[0] = mat
                 else:
                     obj.data.materials.append(mat)
-            mat_count += 1
-
-        self.report({'INFO'}, f"Assigned {mat_count} shared material(s) by base name.")
         return {'FINISHED'}
 
 
@@ -258,74 +176,16 @@ class OBJECT_OT_select_open_boundaries(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        selected_meshes = [obj for obj in context.selected_objects if obj.type == 'MESH']
-
-        if not selected_meshes:
-            self.report({'WARNING'}, "No mesh objects selected")
-            return {'CANCELLED'}
-
         if context.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
-
-        problem_objects = []
-
-        for obj in selected_meshes:
-            bm = bmesh.new()
-            bm.from_mesh(obj.data)
-            bm.edges.ensure_lookup_table()
-            bm.verts.ensure_lookup_table()
-
-            real_open_edges = 0
-            for e in bm.edges:
-                if len(e.link_faces) == 1:
-                    v1, v2 = e.verts
-                    if len(v1.link_faces) <= 2 and len(v2.link_faces) <= 2:
-                        real_open_edges += 1
-
-            bm.free()
-
-            if real_open_edges > 0:
-                problem_objects.append(obj)
-                obj.hide_set(False)
-                obj.select_set(True)
-            else:
-                obj.select_set(False)
-                obj.hide_set(True)
-
-        if not problem_objects:
-            self.report({'INFO'}, "All selected objects are clean! No open boundaries found.")
-            return {'FINISHED'}
-
-        context.view_layer.objects.active = problem_objects[0]
-        for obj in problem_objects:
-            obj.select_set(True)
-
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_mode(type='EDGE')
-
-        total_selected_edges = 0
-        for obj in problem_objects:
-            bm_edit = bmesh.from_edit_mesh(obj.data)
-            bm_edit.edges.ensure_lookup_table()
-            bm_edit.verts.ensure_lookup_table()
-
-            for v in bm_edit.verts:
-                v.select = False
-            for e in bm_edit.edges:
-                e.select = False
-
-            for e in bm_edit.edges:
-                if len(e.link_faces) == 1:
-                    v1, v2 = e.verts
-                    if len(v1.link_faces) <= 2 and len(v2.link_faces) <= 2:
-                        e.select = True
-                        v1.select = True
-                        v2.select = True
-                        total_selected_edges += 1
-
-            bmesh.update_edit_mesh(obj.data)
-
-        self.report({'INFO'}, f"Highlighted {total_selected_edges} open edge(s) across {len(problem_objects)} object(s).")
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                bm = bmesh.new()
+                bm.from_mesh(obj.data)
+                has_open = any(len(e.link_faces) == 1 for e in bm.edges)
+                bm.free()
+                obj.hide_set(not has_open)
+                obj.select_set(has_open)
         return {'FINISHED'}
 
 
@@ -335,17 +195,9 @@ class OBJECT_OT_show_all_objects(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        if context.mode != 'OBJECT':
-            bpy.ops.object.mode_set(mode='OBJECT')
-
-        count = 0
         for obj in context.scene.objects:
-            if obj.hide_get():
-                obj.hide_set(False)
-                obj.select_set(True)
-                count += 1
-
-        self.report({'INFO'}, f"Revealed {count} hidden object(s).")
+            obj.hide_set(False)
+            obj.select_set(True)
         return {'FINISHED'}
 
 
@@ -355,30 +207,15 @@ class OBJECT_OT_fill_holes(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        selected_meshes = [obj for obj in context.selected_objects if obj.type == 'MESH']
-        
-        if not selected_meshes:
-            self.report({'WARNING'}, "No mesh objects selected")
-            return {'CANCELLED'}
-
         if context.mode != 'EDIT':
             bpy.ops.object.mode_set(mode='EDIT')
-
-        filled_count = 0
-        for obj in selected_meshes:
-            bm = bmesh.from_edit_mesh(obj.data)
-            bm.edges.ensure_lookup_table()
-            
-            open_edges = [e for e in bm.edges if e.select and len(e.link_faces) == 1]
-            if open_edges:
-                try:
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                bm = bmesh.from_edit_mesh(obj.data)
+                open_edges = [e for e in bm.edges if e.select and len(e.link_faces) == 1]
+                if open_edges:
                     bmesh.ops.holes_fill(bm, edges=open_edges, sides=4)
                     bmesh.update_edit_mesh(obj.data)
-                    filled_count += 1
-                except:
-                    pass
-
-        self.report({'INFO'}, f"Filled holes with quad grid faces on {filled_count} object(s).")
         return {'FINISHED'}
 
 
@@ -389,79 +226,145 @@ class OBJECT_OT_check_uv_overlap(bpy.types.Operator):
 
     def execute(self, context):
         selected_meshes = [obj for obj in context.selected_objects if obj.type == 'MESH']
-
         if not selected_meshes:
-            self.report({'WARNING'}, "No mesh objects selected")
             return {'CANCELLED'}
-
         if context.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
-
-        # تجميع المجسمات حسب المواد (Materials) المشتركة
-        mat_groups = {}
-        for obj in selected_meshes:
-            mats = tuple(slot.material for slot in obj.material_slots if slot.material)
-            if not mats:
-                mats = (None,)
-            for mat in mats:
-                if mat not in mat_groups:
-                    mat_groups[mat] = []
-                mat_groups[mat].append(obj)
-
         overlap_objects = set()
-
-        for mat, objs in mat_groups.items():
-            if len(objs) < 2:
-                # إذا كان مجسم واحد فقط يخضع لهذه المادة، نتأكد داخلياً من الـ UV خاصته عبر بيئة العمل المؤقتة
-                pass
-
-            # للتحقق من تداخل الـ UV بين المجسمات التي تشترك في نفس الخامة، نقوم بدمج مؤقت أو فحص الأجزاء
-            # سنقوم بإنشاء نسخة مؤقتة دمجية لكل مجموعة مواد للتحقق من تداخل الـ UV بدقة باستخدام أداة بلندر المدمجة
-            
-            # إلغاء تحديد الكل ثم تحديد مجسمات هذه المجموعة فقط
-            bpy.ops.object.select_all(action='DESELECT')
-            for obj in objs:
-                obj.select_set(True)
-                obj.hide_set(False)
-
-            if len(objs) > 0:
-                context.view_layer.objects.active = objs[0]
-                
-                # الدخول لوضع التعديل لفحص التداخل للـ UV الخاص بالمادة الحالية
-                bpy.ops.object.mode_set(mode='EDIT')
-                bpy.ops.mesh.select_all(action='SELECT')
-                
-                # استخدام أمر بلندر المدمج لتحديد الـ UV المتداخل (Linked/Overlap)
-                # بما أن uv_select_overlap يتطلب وجود UV وتفعيل الأداة، سنستخدمه عبر الـ operator الداخلي
-                try:
-                    bpy.ops.uv.select_overlap()
-                except:
-                    pass
-
-                # التحقق مما إذا تم تحديد أي وجوه/أجزاء متداخلة
-                has_overlap = False
-                for obj in objs:
-                    bm = bmesh.from_edit_mesh(obj.data)
-                    bm.faces.ensure_lookup_table()
-                    if any(f.select for f in bm.faces):
-                        has_overlap = True
-                        overlap_objects.add(obj)
-                    bmesh.update_edit_mesh(obj.data)
-
-                bpy.ops.object.mode_set(mode='OBJECT')
-
-        # إخفاء المجسمات السليمة (التي ليس بها تداخل) وإبقاء وتحديد المجسمات التي بها تداخل
-        hidden_count = 0
         for obj in selected_meshes:
-            if obj in overlap_objects:
-                obj.select_set(True)
-                obj.hide_set(False)
-            else:
-                obj.select_set(False)
-                obj.hide_set(True)
-                hidden_count += 1
+            bpy.ops.object.select_all(action='DESELECT')
+            obj.select_set(True)
+            context.view_layer.objects.active = obj
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            try:
+                bpy.ops.uv.select_overlap()
+                bm = bmesh.from_edit_mesh(obj.data)
+                if any(f.select for f in bm.faces):
+                    overlap_objects.add(obj)
+            except:
+                pass
+            bpy.ops.object.mode_set(mode='OBJECT')
+        for obj in selected_meshes:
+            is_overlap = obj in overlap_objects
+            obj.select_set(is_overlap)
+            obj.hide_set(not is_overlap)
+        return {'FINISHED'}
 
-        self.report({'INFO'}, f"UV Check complete. Found {len(overlap_objects)} object(s) with overlap (kept visible). Hidden {hidden_count} clean object(s).")
+
+def check_max_connection_status():
+    if os.path.exists(BRIDGE_FILE_PATH):
+        try:
+            with open(BRIDGE_FILE_PATH, 'r') as f:
+                data = json.load(f)
+                if data.get("status") == "active":
+                    return True
+        except:
+            pass
+    return False
+
+
+class OBJECT_OT_check_max_connection(bpy.types.Operator):
+    bl_idname = "object.check_max_connection"
+    bl_label = "Check Max Connection"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        if check_max_connection_status():
+            self.report({'INFO'}, "Successfully connected to 3ds Max! 🟢")
+        else:
+            self.report({'ERROR'}, "3ds Max is not connected. Run the Max script first! 🔴")
+        return {'FINISHED'}
+
+
+class OBJECT_OT_export_to_max(bpy.types.Operator):
+    bl_idname = "object.export_to_max"
+    bl_label = "Export to 3ds Max"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        if not context.selected_objects:
+            self.report({'ERROR'}, "No objects selected to export! ❌")
+            return {'CANCELLED'}
+        
+        try:
+            bpy.ops.wm.obj_export(
+                filepath=EXPORT_FILE_PATH, 
+                export_selected_objects=True, 
+                global_scale=1.0,
+                export_normals=True
+            )
+            with open(BRIDGE_FILE_PATH, 'w') as f:
+                json.dump({"status": "active", "sync": "ready"}, f)
+            self.report({'INFO'}, "Successfully exported to 3ds Max! 🚀")
+        except Exception as e:
+            self.report({'ERROR'}, f"Export failed: {str(e)}")
+            return {'CANCELLED'}
+            
+        return {'FINISHED'}
+
+
+class OBJECT_OT_export_to_substance(bpy.types.Operator):
+    bl_idname = "object.export_to_substance"
+    bl_label = "Send to Substance"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        if not context.selected_objects:
+            self.report({'ERROR'}, "No objects selected for Substance Painter! ❌")
+            return {'CANCELLED'}
+        try:
+            bpy.ops.wm.obj_export(
+                filepath=SUBSTANCE_EXPORT_PATH, 
+                export_selected_objects=True, 
+                global_scale=1.0,
+                export_normals=True
+            )
+            self.report({'INFO'}, "Successfully exported to Substance Painter! 🎨")
+        except Exception as e:
+            self.report({'ERROR'}, f"Substance export failed: {str(e)}")
+            return {'CANCELLED'}
+        return {'FINISHED'}
+
+
+# --- زر تصدير FBX بالإعدادات المصححة لإصدارات بلندر الحديثة ---
+class OBJECT_OT_export_custom_fbx(bpy.types.Operator, ExportHelper):
+    bl_idname = "object.export_custom_fbx"
+    bl_label = "Export FBX As..."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    filename_ext = ".fbx"
+
+    filter_glob: StringProperty(
+        default="*.fbx",
+        options={'HIDDEN'},
+        maxlen=255,
+    )
+
+    def execute(self, context):
+        if not context.selected_objects:
+            self.report({'ERROR'}, "No objects selected to export! ❌")
+            return {'CANCELLED'}
+        
+        try:
+            bpy.ops.export_scene.fbx(
+                filepath=self.filepath,
+                use_selection=True,
+                global_scale=1.0,
+                apply_scale_options='FBX_SCALE_ALL',
+                axis_forward='-Z',
+                axis_up='Y',
+                apply_unit_scale=True,
+                use_space_transform=True,
+                bake_space_transform=False,
+                object_types={'EMPTY', 'CAMERA', 'LIGHT', 'ARMATURE', 'MESH', 'OTHER'},
+                bake_anim=False
+            )
+            self.report({'INFO'}, f"Successfully exported FBX to: {self.filepath} 📦")
+        except Exception as e:
+            self.report({'ERROR'}, f"FBX Export failed: {str(e)}")
+            return {'CANCELLED'}
+            
         return {'FINISHED'}
 
 
@@ -469,12 +372,10 @@ class OBJECT_OT_copy_to_clipboard(bpy.types.Operator):
     bl_idname = "object.copy_to_clipboard"
     bl_label = "Copy"
     bl_options = {'INTERNAL'}
-
     text_to_copy: StringProperty()
 
     def execute(self, context):
         context.window_manager.clipboard = self.text_to_copy
-        self.report({'INFO'}, f"Copied to clipboard: {self.text_to_copy}")
         return {'FINISHED'}
 
 
@@ -484,52 +385,28 @@ class OBJECT_OT_show_origins_info(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def invoke(self, context, event):
-        selected = context.selected_objects
-        if not selected:
-            self.report({'WARNING'}, "No objects selected")
+        if not context.selected_objects:
             return {'CANCELLED'}
         return context.window_manager.invoke_props_dialog(self, width=420)
 
     def draw(self, context):
         layout = self.layout
-        selected = context.selected_objects
-        
-        if not selected:
-            layout.label(text="No objects selected.")
-            return
-
-        layout.label(text=f"Origins Info for {len(selected)} selected object(s) [mm]:", icon='INFO')
-        layout.separator()
-
-        for obj in selected:
-            x_mm = obj.location.x * 1000.0
-            y_mm = obj.location.y * 1000.0
-            z_mm = obj.location.z * 1000.0
-
+        for obj in context.selected_objects:
             box = layout.box()
             box.label(text=f"Name: {obj.name}", icon='OBJECT_DATA')
-
-            row_x = box.row(align=True)
-            row_x.label(text=f"X: {x_mm:.2f} mm")
-            op_x = row_x.operator("object.copy_to_clipboard", text="", icon='COPYDOWN')
-            op_x.text_to_copy = f"{x_mm:.2f}"
-
-            row_y = box.row(align=True)
-            row_y.label(text=f"Y: {y_mm:.2f} mm")
-            op_y = row_y.operator("object.copy_to_clipboard", text="", icon='COPYDOWN')
-            op_y.text_to_copy = f"{y_mm:.2f}"
-
-            row_z = box.row(align=True)
-            row_z.label(text=f"Z: {z_mm:.2f} mm")
-            op_z = row_z.operator("object.copy_to_clipboard", text="", icon='COPYDOWN')
-            op_z.text_to_copy = f"{z_mm:.2f}"
+            for axis, val in [('X', obj.location.x), ('Y', obj.location.y), ('Z', obj.location.z)]:
+                row = box.row(align=True)
+                val_mm = val * 1000.0
+                row.label(text=f"{axis}: {val_mm:.2f} mm")
+                op = row.operator("object.copy_to_clipboard", text="", icon='COPYDOWN')
+                op.text_to_copy = f"{val_mm:.2f}"
 
     def execute(self, context):
         return {'FINISHED'}
 
 
 class VIEW3D_PT_sequential_rename_panel(bpy.types.Panel):
-    bl_label = f"Ali Assiri Tools 🛠️"
+    bl_label = "Ali Assiri Tools 🛠️"
     bl_idname = "VIEW3D_PT_sequential_rename"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -558,6 +435,13 @@ class VIEW3D_PT_sequential_rename_panel(bpy.types.Panel):
         col.operator("object.show_all_objects", text="Show All Objects 👁️", icon='HIDE_OFF')
         col.operator("object.fill_holes", text="Fill Holes (Quad Grid) 🔲", icon='MESH_GRID')
         col.operator("object.check_uv_overlap", text="Check UV Overlap 🧬", icon='UV_DATA')
+        
+        col.separator()
+        col.label(text="Pipeline Bridges 🔗:", icon='FILE_TICK')
+        col.operator("object.check_max_connection", text="Check Max Connection 🟢", icon='NETWORK_DRIVE')
+        col.operator("object.export_to_max", text="Export to 3ds Max 🚀", icon='EXPORT')
+        col.operator("object.export_to_substance", text="Send to Substance 🎨", icon='TEXTURE')
+        col.operator("object.export_custom_fbx", text="Export FBX As... 📦", icon='EXPORT')
 
 
 classes = (
@@ -571,21 +455,22 @@ classes = (
     OBJECT_OT_show_all_objects,
     OBJECT_OT_fill_holes,
     OBJECT_OT_check_uv_overlap,
+    OBJECT_OT_check_max_connection,
+    OBJECT_OT_export_to_max,
+    OBJECT_OT_export_to_substance,
+    OBJECT_OT_export_custom_fbx,
     OBJECT_OT_copy_to_clipboard,
     OBJECT_OT_show_origins_info,
     VIEW3D_PT_sequential_rename_panel,
 )
 
-
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
-
 
 if __name__ == "__main__":
     register()
