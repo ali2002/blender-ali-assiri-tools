@@ -1,62 +1,61 @@
-macroScript BlenderBridgeToggle
+macroScript AliBlenderBridgeNew
 category:"Ali Assiri Tools"
-toolTip:"Blender Connection Manager 🔗"
-buttonText:"Blender Toggle"
+toolTip:"Ali Blender Bridge"
+buttonText:"Ali Blender Bridge"
 (
     global blenderBridgeActive
     global blenderListenerTimer
     global blenderBridgeRollout
     
-    -- دالة إنهاء الاتصال وتنظيف الواجهة
+    -- Close connection and clean up UI
     fn closeBlenderBridge = 
     (
         blenderBridgeActive = false
         try (destroyDialog blenderBridgeRollout) catch()
         
-        -- حذف ملف الجسر من النظام لقطع الاتصال من جهة بلندر أيضاً
+        -- Delete the bridge file to fully stop the Blender-side connection
         local bridge_file = sysInfo.tempdir + "blender_max_bridge.json"
         if doesFileExist bridge_file do (deleteFile bridge_file)
         
-        print "Blender Bridge Disconnected & Closed! 🔴"
-        messageBox "تم إنهاء الاتصال بنجاح وتوقف المراقبة." title:"Blender Bridge"
+        print "Blender Bridge Disconnected and Closed."
+        messageBox "Connection closed successfully. Monitoring stopped." title:"Ali Blender Bridge"
     )
 
-    -- إذا كان متصلاً مسبقاً، قم بإغلاق الاتصال
+    -- If already connected, close the connection
     if blenderBridgeActive == true then
     (
         closeBlenderBridge()
     )
     else
     (
-        -- إذا لم يكن متصلاً، افتح الاتصال وبدأ المراقبة
+        -- If not connected, start connection and monitoring
         blenderBridgeActive = true
         
         try (destroyDialog blenderBridgeRollout) catch()
         
-        -- تعريف الواجهة (Rollout) مع النصوص العربية المحدثة
-        rollout blenderBridgeRollout "Blender Connection Manager" width:250 height:90
+        -- Define the rollout UI
+        rollout blenderBridgeRollout "Ali Blender Bridge" width:250 height:90
         (
-            -- نصوص عربية واضحة (تم التأكد من الترميز)
-            label lbl_status "الحالة: جاري الاتصال والمراقبة... 🟢" pos:[10,15] width:230 height:20
-            button btn_toggle_conn "إنهاء الاتصال (Disconnect) ❌" pos:[10,45] width:230 height:35
+            label lbl_status "Status: Connected and monitoring..." pos:[10,15] width:230 height:20
+            button btn_toggle_conn "Disconnect" pos:[10,45] width:230 height:35
             
             timer t interval:1000 active:true
             global lastExportTime = ""
             
-            -- زر الإنهاء اليدوي من داخل النافذة
+            -- Manual disconnect button inside the dialog
             on btn_toggle_conn pressed do
             (
                 closeBlenderBridge()
             )
             
-            -- مراقبة التحديثات من بلندر
+            -- Monitor updates from Blender
             on t tick do 
             (
                 if blenderBridgeActive == true then
                 (
                     local bridge_file = sysInfo.tempdir + "blender_max_bridge.json"
                     
-                    -- التأكد من بقاء ملف الاتصال نشطاً
+                    -- Ensure the bridge status file remains active
                     if not (doesFileExist bridge_file) then
                     (
                         local f = openFile bridge_file mode:"w"
@@ -74,10 +73,10 @@ buttonText:"Blender Toggle"
                             
                             local oldSelection = getCurrentSelection()
                             
-                            -- استيراد ملف الـ OBJ
+                            -- Import OBJ file
                             importFile f #noPrompt using:OBJ
                             
-                            -- تعديل حجم المجسمات الجديدة ليطابق المتر تماماً
+                            -- Scale newly imported objects to match meter-based scale
                             local newObjects = for obj in (getCurrentSelection()) where (findItem oldSelection obj == 0) collect obj
                             if newObjects.count > 0 then
                             (
@@ -87,11 +86,11 @@ buttonText:"Blender Toggle"
                                 )
                             )
                             
-                            -- حذف ملف الـ OBJ المؤقت لضمان استقبال التصديرات القادمة
+                            -- Remove temp OBJ to allow future exports
                             try (deleteFile f) catch()
                             
-                            print "Model Auto-Imported & Scaled Successfully! 🚀"
-                            lbl_status.text = "الحالة: تم استيراد المجسم بنجاح! 🎯"
+                            print "Model auto-imported and scaled successfully."
+                            lbl_status.text = "Status: Model imported successfully."
                         )
                     )
                 )
@@ -105,13 +104,13 @@ buttonText:"Blender Toggle"
             )
         )
         
-        -- تفعيل ملف الاتصال الفوري
+        -- Create bridge status file immediately
         local bridge_file = sysInfo.tempdir + "blender_max_bridge.json"
         local f = openFile bridge_file mode:"w"
         format "{\n  \"status\": \"active\"\n}" to:f
         close f
         
         createDialog blenderBridgeRollout 250 90 style:#(#style_toolwindow, #style_sysmenu, #style_minimizebox)
-        print "Blender Bridge Opened & Connected! 🟢"
+        print "Blender Bridge Opened and Connected."
     )
 )
