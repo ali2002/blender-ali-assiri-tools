@@ -84,8 +84,8 @@ The core powerhouse of the addon, ensuring seamless round-tripping with external
 * **Export to 3ds Max 🚀**
   * **What it does:** Instantly exports selected objects to a structured `.obj` pathway (`blender_export.obj`) located in the OS temp folder. 
   * **Smooth Shading Preservation:** Explicitly forces normal data export (`export_normals=True`), ensuring that smooth groups and custom edge shadings transition accurately into 3ds Max without dropping into harsh flat shading.
-* **Send to Substance 🎨**
-  * **What it does:** Bundles selected meshes and outputs them directly to the designated Substance Painter exchange directory (`blender_to_substance.obj`) with preserved normals, allowing instant texture project updates.
+* **Send to Substance 🎨 *(In Development)*:**
+  * **What it does:** Designed to bundle selected meshes and output them directly to a designated exchange directory for **Substance Painter** integration. *Note: This feature is currently under active development and refinement.*
 * **Export FBX As... 📦**
   * **What it does:** Opens a native, fully integrated file-browser dialog allowing you to choose your custom destination path and filename for a production-ready **FBX** export.
   * **Exact Pipeline Settings Enforced:** Automatically injects professional preset parameters:
