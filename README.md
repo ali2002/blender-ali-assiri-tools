@@ -1,102 +1,86 @@
-# Ali Pipeline Tools (v1.46) 🛠️🌟
+# Ali Pipeline Tools (v1.46)
 
-A comprehensive, production-proven toolset developed for **Blender** (fully compatible with modern 3.x, 4.x, and 5.x releases) and **3ds Max**. It is engineered to streamline modeling pipelines, enforce strict scene hygiene, automate smart naming protocols, and bridge communication seamlessly with **3ds Max** and **Substance Painter** via robust file-based pipelines.
+Ali Pipeline Tools is a Blender add-on focused on fast production cleanup, smart naming, mesh validation, and reliable bridge export workflows for 3ds Max and Substance Painter.
 
----
+## What Is New
 
-## 🖼️ Addon Interfaces & Toolsets
+- Added Select Group in Scene: opens a menu of base group names (example: wall)
+- Added one-click isolation after group select: selects the chosen group and hides everything else
+- Updated branding to Ali across UI labels and docs
 
-### 1. Blender Sidebar UI (N-Panel)
-Here is a preview of how the **Ali Tools** panel looks inside Blender's 3D Viewport Sidebar:
+## Interface Preview
+
+### Blender Sidebar (N-Panel)
+
+The panel appears in View3D Sidebar under the Ali tab.
 
 <p align="center">
   <img src="images/blender.png" alt="Ali Blender Tools UI" width="300">
 </p>
 
-### 2. 3ds Max Bridge UI
-Here is the companion **Ali Blender Bridge** interface inside 3ds Max showing an active connection state:
+### 3ds Max Bridge
+
+The companion bridge macro appears in 3ds Max as Ali Blender Bridge.
 
 <p align="center">
   <img src="images/max.png" alt="Ali Blender Bridge in 3ds Max" width="300">
 </p>
 
----
+## Features
 
-## 📋 Detailed Feature Guide & UI Breakdown
+### Naming and Management
 
-Once installed, the tools appear in the Blender Sidebar (**N-Panel**) under the dedicated tab **Ali 🌟**. Here is an exhaustive guide to every section, operator, and underlying workflow:
+- Sequential Rename: renames selected objects by nearest spatial order with automatic digit padding
+- Make Names Uppercase: converts selected names to uppercase
+- Clear Animation Data: removes animation data from selected objects
 
----
+### Group Selection and Isolation
 
-### 1. Renaming & Animation Tools
-This section focuses on automating tedious manual clean-up tasks across multiple selected items.
+- Select Group in Scene:
+  - Builds a dynamic menu from scene object base names
+  - Shows one line per group name (example: wall)
+  - When you click a group, all objects in that group are selected
+  - All other scene objects are hidden automatically
 
-* **Sequential Rename 📋**
-  * **What it does:** Automatically renames a selection of objects in a precise chronological sequence.
-  * **Smart Proximity Sorting:** Before applying names, the script evaluates the spatial coordinates (X and Y positions) of all selected objects and automatically designates the closest object to the center/origin as `_01`, proceeding logically outward.
-  * **Dynamic Digit Padding:** Clicking the button triggers an interactive pop-up dialog (`invoke_props_dialog`) allowing you to type your custom base name. The script automatically sizes the numbering digits (starting at a minimum of two digits like `_01`, and dynamically expanding to 3 or more digits if your selection exceeds 99 objects).
-* **Make Names Uppercase 🔠**
-  * **What it does:** Instantly converts the text strings of all selected object names into capital letters (`UPPERCASE`), ensuring strict naming conventions across your asset lists.
-* **Clear Animation Data ❌**
-  * **What it does:** Strips and removes all animation data blocks, keyframes, and drivers from the selected objects, preventing unwanted movement or evaluation lags when exporting static geometry.
+### Origin and Alignment
 
----
+- Origin to Nearest (0,0): snaps each selected mesh origin to nearest evaluated point
+- Align Relative to X/Y Axes: shifts selected meshes relative to global X and Y alignment
+- Show Origins Info: displays X/Y/Z origin values in millimeters with copy buttons
 
-### 2. Origins & Alignment Tools
-Precise pivot placement and spatial alignment are vital for pipeline handoffs. These tools automate complex mathematical alignment:
+### Materials
 
-* **Origin to Nearest (0,0) 🎯**
-  * **What it does:** Iterates through selected mesh objects, evaluates every vertex position in world space, locates the absolute closest vertex or zero-boundary point, and instantly snaps the object's local origin (pivot point) to that precise location.
-* **Align Relative to X/Y Axes 📐**
-  * **What it does:** Scans the bounding bounds and vertex coordinates of selected meshes relative to the global axes, shifting their positions to clean relative coordinates along the X and Y axes.
-* **Show Origins Info 📍**
-  * **What it does:** Opens a detailed, interactive pop-up diagnostic window listing every selected object by name and displaying its exact pivot coordinates (`X`, `Y`, `Z`) converted precisely into **millimeters**.
-  * **Quick-Copy Integration:** Each coordinate row features a dedicated copy button (`Copydown`) that instantly copies the millimeter value directly to your system clipboard for external calculations or game-engine requirements.
+- Assign Shared Colors: groups by base name and assigns distinct generated materials
 
----
+### Mesh Inspection
 
-### 3. Materials & Shading
-* **Assign Shared Colors 🎨**
-  * **What it does:** Automatically groups selected meshes by stripping trailing numerical suffixes (e.g., matching `Prop_01` and `Prop_02` to a base name like `Prop`). 
-  * **Algorithmic HSV Generation:** For each unique base group, it creates or retrieves a dedicated material, enables nodes, accesses the *Principled BSDF* shader, and procedurally assigns a distinct, evenly spaced color using an HSV color algorithm. This provides instant visual color-coding in Blender's *Material Preview* viewport mode.
+- Select Open Boundaries: detects open-edge meshes and isolates them
+- Show All Objects: unhides and selects all objects
+- Fill Holes (Quad Grid): fills selected open loops in edit mode
+- Check UV Overlap: identifies and isolates overlap issues on selected meshes
 
----
+### Bridge and Export
 
-### 4. Hole & Mesh Inspection Tools 🔍
-Crucial topology-checking utilities designed to isolate and diagnose problematic geometry before exporting:
+- Check Max Connection: verifies active bridge file state
+- Export to 3ds Max: exports selected objects to temp OBJ with normals
+- Send to Substance: exports selected objects to Substance temp OBJ path
+- Export FBX As: exports selected objects with pipeline-safe FBX settings
 
-* **Select Open Boundaries 🔍**
-  * **What it does:** Switches temporarily to object/mesh analysis, parses the BMesh topology to find any edges linked to only one face (unsealed borders/holes), selects those objects, and **hides everything else in the scene** so you can focus entirely on broken geometry.
-* **Show All Objects 👁️**
-  * **What it does:** A global safety-switch that unhides all hidden objects in the scene and re-selects them simultaneously.
-* **Fill Holes (Quad Grid) 🔲**
-  * **What it does:** When working inside *Edit Mode*, running this operator targets selected open boundary loops and executes a specialized quad-grid hole fill (`bmesh.ops.holes_fill`), converting ugly N-gons into clean, sub-d friendly quad topologies.
-* **Check UV Overlap 🧬**
-  * **What it does:** Automatically loops through selected mesh objects, enters edit mode behind the scenes, executes Blender's UV overlap detection operator (`uv.select_overlap`), and isolates/hides any object containing overlapping UV coordinates.
+## Installation
 
----
+1. Download ali_assiri_tools.py from this repository.
+2. In Blender, open Edit > Preferences > Add-ons.
+3. Click Install and choose ali_assiri_tools.py.
+4. Enable the add-on from the add-ons list.
+5. Open the Ali tab in the View3D Sidebar.
 
-### 5. Pipeline Bridges & Custom Exporting 🔗
-The core powerhouse of the addon, ensuring seamless round-tripping with external 3D software:
+## Compatibility
 
-* **Check Max Connection 🟢**
-  * **What it does:** Scans the local system temporary directory for the bridge communication protocol file (`blender_max_bridge.json`) to verify if an active synchronization state exists with **3ds Max**.
-* **Export to 3ds Max 🚀**
-  * **What it does:** Instantly exports selected objects to a structured `.obj` pathway (`blender_export.obj`) located in the OS temp folder. 
-  * **Smooth Shading Preservation:** Explicitly forces normal data export (`export_normals=True`), ensuring that smooth groups and custom edge shadings transition accurately into 3ds Max without dropping into harsh flat shading.
-* **Send to Substance 🎨 *(In Development)*:**
-  * **What it does:** Designed to bundle selected meshes and output them directly to a designated exchange directory for **Substance Painter** integration. *Note: This feature is currently under active development and refinement.*
-* **Export FBX As... 📦**
-  * **What it does:** Opens a native, fully integrated file-browser dialog allowing you to choose your custom destination path and filename for a production-ready **FBX** export.
-  * **Exact Pipeline Settings Enforced:** Automatically injects professional preset parameters:
-    * *Selected Objects Only* (`use_selection=True`)
-    * *Global Scale 1.0* with full transform application (`apply_scale_options='FBX_SCALE_ALL'`)
-    * *Axis Conversion:* Standard Unreal/Max orientation compliance (`-Z Forward`, `Y Up`)
-    * *Unit & Space Scaling:* Forces `apply_unit_scale=True` and `use_space_transform=True` to prevent scaling mismatches across different software packages.
+- Blender: 3.0 and newer
+- 3ds Max: versions that support macroscripts and custom toolbars
+- OS: Windows (uses temp-directory bridge files)
 
----
+## Notes
 
-## ⚙️ System Requirements & Compatibility
-* **Blender Version:** Fully optimized for Blender 3.x, 4.x, and latest 5.x architecture.
-* **3ds Max Version:** Compatible with versions supporting macroscripts and UI toolbars.
-* **Operating System:** Designed primarily for **Windows** environments, utilizing OS temporary directories (`tempfile`) for instantaneous inter-application pipeline messaging.
+- Group matching is based on base-name parsing (numeric suffixes after dot or underscore are grouped together).
+- Example: wall_01, wall_02, wall.001 are treated as one group.

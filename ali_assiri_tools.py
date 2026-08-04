@@ -30,6 +30,18 @@ def distance_xy(obj_a, obj_b):
     return math.sqrt(dx * dx + dy * dy)
 
 
+def get_group_base_name(name):
+    return re.sub(r'[\._]\d+$', '', name)
+
+
+def get_scene_object_groups(scene):
+    groups = {}
+    for obj in scene.objects:
+        base_name = get_group_base_name(obj.name)
+        groups.setdefault(base_name, []).append(obj)
+    return groups
+
+
 class OBJECT_OT_sequential_rename(bpy.types.Operator):
     bl_idname = "object.sequential_rename"
     bl_label = "Sequential Rename"
@@ -153,7 +165,7 @@ class OBJECT_OT_assign_unique_materials(bpy.types.Operator):
         selected = [obj for obj in context.selected_objects if obj.type == 'MESH']
         groups = {}
         for obj in selected:
-            base_name = re.sub(r'[\._]\d+$', '', obj.name)
+            base_name = get_group_base_name(obj.name)
             groups.setdefault(base_name, []).append(obj)
         for idx, (base_name, objs) in enumerate(groups.items()):
             mat = bpy.data.materials.get(base_name) or bpy.data.materials.new(name=base_name)
@@ -167,6 +179,62 @@ class OBJECT_OT_assign_unique_materials(bpy.types.Operator):
                     obj.data.materials[0] = mat
                 else:
                     obj.data.materials.append(mat)
+        return {'FINISHED'}
+
+
+class OBJECT_OT_select_objects_by_group(bpy.types.Operator):
+    bl_idname = "object.select_objects_by_group"
+    bl_label = "Select Objects by Group"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    group_name: StringProperty()
+
+    def execute(self, context):
+        groups = get_scene_object_groups(context.scene)
+        group_objects = groups.get(self.group_name, [])
+        if not group_objects:
+            self.report({'ERROR'}, f"Group '{self.group_name}' not found.")
+            return {'CANCELLED'}
+
+        if context.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+        group_object_names = {obj.name for obj in group_objects}
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in context.scene.objects:
+            is_in_group = obj.name in group_object_names
+            obj.hide_set(not is_in_group)
+            obj.select_set(is_in_group)
+
+        context.view_layer.objects.active = group_objects[0]
+        self.report({'INFO'}, f"Selected {len(group_objects)} object(s) in group '{self.group_name}' and hid all others.")
+        return {'FINISHED'}
+
+
+class OBJECT_MT_select_group_menu(bpy.types.Menu):
+    bl_idname = "OBJECT_MT_select_group_menu"
+    bl_label = "Select Group"
+
+    def draw(self, context):
+        layout = self.layout
+        group_names = sorted(get_scene_object_groups(context.scene).keys(), key=str.casefold)
+
+        if not group_names:
+            layout.label(text="No objects found in scene.", icon='INFO')
+            return
+
+        for group_name in group_names:
+            op = layout.operator("object.select_objects_by_group", text=group_name, icon='OBJECT_DATA')
+            op.group_name = group_name
+
+
+class OBJECT_OT_open_group_selector_menu(bpy.types.Operator):
+    bl_idname = "object.open_group_selector_menu"
+    bl_label = "Select Group in Scene"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        bpy.ops.wm.call_menu(name="OBJECT_MT_select_group_menu")
         return {'FINISHED'}
 
 
@@ -420,6 +488,7 @@ class VIEW3D_PT_sequential_rename_panel(bpy.types.Panel):
         col.operator("object.sequential_rename", text="Sequential Rename 📋", icon='SORTALPHA')
         col.operator("object.uppercase_names", text="Make Names Uppercase 🔠", icon='SYNTAX_ON')
         col.operator("object.clear_animation", text="Clear Animation Data ❌", icon='ANIM')
+        col.operator("object.open_group_selector_menu", text="Select Group in Scene", icon='GROUP')
         col.separator()
         
         col.operator("object.origin_to_nearest_zero", text="Origin to Nearest (0,0) 🎯", icon='OBJECT_ORIGIN')
@@ -451,6 +520,9 @@ classes = (
     OBJECT_OT_origin_to_nearest_zero,
     OBJECT_OT_align_to_axes_relative,
     OBJECT_OT_assign_unique_materials,
+    OBJECT_OT_select_objects_by_group,
+    OBJECT_MT_select_group_menu,
+    OBJECT_OT_open_group_selector_menu,
     OBJECT_OT_select_open_boundaries,
     OBJECT_OT_show_all_objects,
     OBJECT_OT_fill_holes,
