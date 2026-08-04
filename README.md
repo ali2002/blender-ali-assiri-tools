@@ -1,4 +1,4 @@
-# Ali Assiri Pipeline Tools (v1.46) 🛠️🌟
+# Ali Pipeline Tools (v1.46) 🛠️🌟
 
 A comprehensive, production-proven toolset developed for **Blender** (fully compatible with modern 3.x, 4.x, and 5.x releases) and **3ds Max**. It is engineered to streamline modeling pipelines, enforce strict scene hygiene, automate smart naming protocols, and bridge communication seamlessly with **3ds Max** and **Substance Painter** via robust file-based pipelines.
 
@@ -7,10 +7,10 @@ A comprehensive, production-proven toolset developed for **Blender** (fully comp
 ## 🖼️ Addon Interfaces & Toolsets
 
 ### 1. Blender Sidebar UI (N-Panel)
-Here is a preview of how the **Ali Assiri Tools** panel looks inside Blender's 3D Viewport Sidebar:
+Here is a preview of how the **Ali Tools** panel looks inside Blender's 3D Viewport Sidebar:
 
 <p align="center">
-  <img src="images/blender.png" alt="Ali Assiri Blender Tools UI" width="300">
+  <img src="images/blender.png" alt="Ali Blender Tools UI" width="300">
 </p>
 
 ### 2. 3ds Max Bridge UI
@@ -24,7 +24,7 @@ Here is the companion **Ali Blender Bridge** interface inside 3ds Max showing an
 
 ## 📋 Detailed Feature Guide & UI Breakdown
 
-Once installed, the tools appear in the Blender Sidebar (**N-Panel**) under the dedicated tab **Ali Assiri 🌟**. Here is an exhaustive guide to every section, operator, and underlying workflow:
+Once installed, the tools appear in the Blender Sidebar (**N-Panel**) under the dedicated tab **Ali 🌟**. Here is an exhaustive guide to every section, operator, and underlying workflow:
 
 ---
 

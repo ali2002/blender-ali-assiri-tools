@@ -1,5 +1,5 @@
 macroScript AliBlenderBridgeNew
-category:"Ali Assiri Tools"
+category:"Ali Tools"
 toolTip:"Ali Blender Bridge"
 buttonText:"Ali Blender Bridge"
 (

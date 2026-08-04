@@ -1,9 +1,9 @@
 bl_info = {
-    "name": "Ali Assiri Pipeline Tools",
-    "author": "Ali Assiri 🌟",
+    "name": "Ali Pipeline Tools",
+    "author": "Ali 🌟",
     "version": (1, 46),
     "blender": (3, 0, 0),
-    "location": "View3D > Sidebar (N) > Ali Assiri 🌟",
+    "location": "View3D > Sidebar (N) > Ali 🌟",
     "description": "Tools with robust file-based connections and fixed FBX export object types.",
     "category": "Object",
 }
@@ -406,11 +406,11 @@ class OBJECT_OT_show_origins_info(bpy.types.Operator):
 
 
 class VIEW3D_PT_sequential_rename_panel(bpy.types.Panel):
-    bl_label = "Ali Assiri Tools 🛠️"
+    bl_label = "Ali Tools 🛠️"
     bl_idname = "VIEW3D_PT_sequential_rename"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "Ali Assiri 🌟"
+    bl_category = "Ali 🌟"
 
     def draw(self, context):
         layout = self.layout

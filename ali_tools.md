@@ -1,4 +1,4 @@
-# Ali Assiri Pipeline Tools (v1.46) 🛠️🌟
+# Ali Pipeline Tools (v1.46) 🛠️🌟
 
 A comprehensive toolset designed for **Blender** to streamline modeling workflows, scene organization, smart naming, and robust file-based pipelining with **3ds Max** and **Substance Painter**.
 
@@ -6,7 +6,7 @@ A comprehensive toolset designed for **Blender** to streamline modeling workflow
 
 ## 📋 Comprehensive Script Overview & Feature Guide
 
-The tools appear in the Blender Sidebar (**N-Panel**) under the **Ali Assiri 🌟** tab. Below is a detailed breakdown of every section and button in the UI:
+The tools appear in the Blender Sidebar (**N-Panel**) under the **Ali 🌟** tab. Below is a detailed breakdown of every section and button in the UI:
 
 ### 1. Naming & Animation Tools
 * **Sequential Rename 📋:**
