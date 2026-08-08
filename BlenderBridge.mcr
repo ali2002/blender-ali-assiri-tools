@@ -1,116 +1,139 @@
-macroScript AliBlenderBridgeNew
+macroscript AliBlenderBridgeNew
 category:"Ali Tools"
 toolTip:"Ali Blender Bridge"
 buttonText:"Ali Blender Bridge"
 (
     global blenderBridgeActive
-    global blenderListenerTimer
     global blenderBridgeRollout
     
-    -- Close connection and clean up UI
+    local sharedDir = "C:\\AliBridge\\"
+    
     fn closeBlenderBridge = 
     (
         blenderBridgeActive = false
         try (destroyDialog blenderBridgeRollout) catch()
-        
-        -- Delete the bridge file to fully stop the Blender-side connection
-        local bridge_file = sysInfo.tempdir + "blender_max_bridge.json"
+        local bridge_file = sharedDir + "blender_max_bridge.json"
         if doesFileExist bridge_file do (deleteFile bridge_file)
-        
-        print "Blender Bridge Disconnected and Closed."
-        messageBox "Connection closed successfully. Monitoring stopped." title:"Ali Blender Bridge"
+        print "Bridge Disconnected."
+        messageBox "Connection closed." title:"Ali Tools"
     )
 
-    -- If already connected, close the connection
-    if blenderBridgeActive == true then
-    (
-        closeBlenderBridge()
-    )
+    if blenderBridgeActive == true then closeBlenderBridge()
     else
     (
-        -- If not connected, start connection and monitoring
         blenderBridgeActive = true
-        
         try (destroyDialog blenderBridgeRollout) catch()
         
-        -- Define the rollout UI
-        rollout blenderBridgeRollout "Ali Blender Bridge" width:250 height:90
+        rollout blenderBridgeRollout "Ali Blender Bridge & Tools" width:250 height:200
         (
-            label lbl_status "Status: Connected and monitoring..." pos:[10,15] width:230 height:20
-            button btn_toggle_conn "Disconnect" pos:[10,45] width:230 height:35
+            label lbl_status "Status: Connected..." pos:[10,12] width:230 height:20
+            button btn_match_name "Match Position & Rotation" pos:[10,40] width:230 height:35
+            button btn_manual_import "Import Latest OBJ Now" pos:[10,85] width:230 height:30
+            button btn_toggle_conn "Disconnect" pos:[10,125] width:230 height:35
             
             timer t interval:1000 active:true
             global lastExportTime = ""
             
-            -- Manual disconnect button inside the dialog
-            on btn_toggle_conn pressed do
+            on btn_match_name pressed do
             (
-                closeBlenderBridge()
+                local bridge_file = sharedDir + "blender_max_bridge.json"
+                if doesFileExist bridge_file then
+                (
+                    try (
+                        local f = openFile bridge_file mode:"r"
+                        local content = readline f
+                        close f
+                        
+                        local name_match = (dotnetClass "System.Text.RegularExpressions.Regex").Match content "\"full_name\":\"([^\"]+)\""
+                        local target_name = (name_match.Groups.Item 1).Value
+                        
+                        local loc_match = (dotnetClass "System.Text.RegularExpressions.Regex").Match content "\"location\":\\[([0-9.-]+),([0-9.-]+),([0-9.-]+)\\]"
+                        local rot_match = (dotnetClass "System.Text.RegularExpressions.Regex").Match content "\"rotation\":\\[([0-9.-]+),([0-9.-]+),([0-9.-]+)\\]"
+                        
+                        if target_name != "" and loc_match.Success and rot_match.Success then (
+                            local px = ((loc_match.Groups.Item 1).Value as float) * 1000.0
+                            local py = ((loc_match.Groups.Item 2).Value as float) * 1000.0
+                            local pz = ((loc_match.Groups.Item 3).Value as float) * 1000.0
+                            
+                            local rx = (rot_match.Groups.Item 1).Value as float
+                            local ry = (rot_match.Groups.Item 2).Value as float
+                            local rz = (rot_match.Groups.Item 3).Value as float
+                            
+                            local found_obj = getNodeByName target_name
+                            if found_obj != undefined then (
+                                found_obj.pos = [px, py, pz]
+                                found_obj.rotation = (eulerAngles rx ry rz)
+                                messageBox ("تم تطبيق الموقع والدوران للمجسم: " + found_obj.name) title:"Ali Tools"
+                            ) else (
+                                messageBox ("لم يتم العثور على مجسم باسم: " + target_name) title:"تنبيه"
+                            )
+                        ) else (
+                            messageBox "خطأ في قراءة بيانات الموقع والدوران من الملف." title:"خطأ"
+                        )
+                    ) catch (
+                        messageBox "حدث خطأ أثناء معالجة ملف البيانات." title:"خطأ"
+                    )
+                ) else (
+                    messageBox "ملف البيانات غير موجود في C:\\AliBridge\\" title:"تنبيه"
+                )
             )
             
-            -- Monitor updates from Blender
+            on btn_manual_import pressed do
+            (
+                local f = sharedDir + "blender_export.obj"
+                if doesFileExist f then (
+                    local oldSelection = getCurrentSelection()
+                    importFile f #noPrompt using:OBJ
+                    local newObjects = for obj in (getCurrentSelection()) where (findItem oldSelection obj == 0) collect obj
+                    if newObjects.count > 0 then (
+                        for obj in newObjects do ( 
+                            obj.scale = obj.scale * 1000.0 
+                            -- تحويل كافة العناصر المستوردة يدوياً إلى Edit Poly بدقة
+                            try (convertTo obj Editable_Poly) catch()
+                        )
+                    )
+                    messageBox "All imported models converted to Editable Poly!" title:"Ali Tools"
+                ) else (
+                    messageBox "لا يوجد ملف OBJ في C:\\AliBridge\\" title:"تنبيه"
+                )
+            )
+
+            on btn_toggle_conn pressed do closeBlenderBridge()
+            
             on t tick do 
             (
                 if blenderBridgeActive == true then
                 (
-                    local bridge_file = sysInfo.tempdir + "blender_max_bridge.json"
-                    
-                    -- Ensure the bridge status file remains active
-                    if not (doesFileExist bridge_file) then
-                    (
-                        local f = openFile bridge_file mode:"w"
-                        format "{\n  \"status\": \"active\"\n}" to:f
-                        close f
-                    )
-                    
-                    local f = sysInfo.tempdir + "blender_export.obj"
+                    if not (doesDirectoryExist sharedDir) then makeDir sharedDir
+                    local f = sharedDir + "blender_export.obj"
                     if doesFileExist f then 
                     (
                         local mTime = getFileCreateDate f
                         if mTime != lastExportTime do 
                         (
                             lastExportTime = mTime
-                            
                             local oldSelection = getCurrentSelection()
-                            
-                            -- Import OBJ file
                             importFile f #noPrompt using:OBJ
-                            
-                            -- Scale newly imported objects to match meter-based scale
                             local newObjects = for obj in (getCurrentSelection()) where (findItem oldSelection obj == 0) collect obj
                             if newObjects.count > 0 then
                             (
-                                for obj in newObjects do
-                                (
-                                    obj.scale = obj.scale * 1000.0
+                                for obj in newObjects do 
+                                ( 
+                                    obj.scale = obj.scale * 1000.0 
+                                    -- تحويل كافة العناصر المستوردة تلقائياً عبر التايمر إلى Edit Poly
+                                    try (convertTo obj Editable_Poly) catch()
                                 )
                             )
-                            
-                            -- Remove temp OBJ to allow future exports
                             try (deleteFile f) catch()
-                            
-                            print "Model auto-imported and scaled successfully."
-                            lbl_status.text = "Status: Model imported successfully."
+                            lbl_status.text = "Status: Imported & converted to Edit Poly."
                         )
                     )
                 )
             )
             
-            on blenderBridgeRollout close do
-            (
-                blenderBridgeActive = false
-                local bridge_file = sysInfo.tempdir + "blender_max_bridge.json"
-                if doesFileExist bridge_file do (deleteFile bridge_file)
-            )
+            on blenderBridgeRollout close do ( blenderBridgeActive = false )
         )
-        
-        -- Create bridge status file immediately
-        local bridge_file = sysInfo.tempdir + "blender_max_bridge.json"
-        local f = openFile bridge_file mode:"w"
-        format "{\n  \"status\": \"active\"\n}" to:f
-        close f
-        
-        createDialog blenderBridgeRollout 250 90 style:#(#style_toolwindow, #style_sysmenu, #style_minimizebox)
-        print "Blender Bridge Opened and Connected."
+        createDialog blenderBridgeRollout 250 200 style:#(#style_toolwindow, #style_sysmenu, #style_minimizebox)
+        print "Bridge Connected."
     )
 )
